@@ -14,7 +14,7 @@ wt_gather$DOB <- mdy(wt_gather$DOB)
 ### and the specific date the weight was taken
 ### convert weight to numeric instead of character
 wt_age <- wt_gather %>% 
-  mutate(age_wt = date - DOB, age_wt = age_wt) %>% 
+  mutate(age_wt = date - DOB) %>% 
   filter(age_wt > 0)
 wt_age$weight <- as.numeric(wt_age$weight)
 
