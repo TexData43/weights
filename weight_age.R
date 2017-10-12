@@ -19,11 +19,11 @@ wt_age <- wt_gather %>%
 wt_age$weight <- as.numeric(wt_age$weight)
 
 ### create a vector and then bin
-vec <- wt_age$age_wt
+age_vec <- wt_age$age_wt
 bin_x <- seq(0, 1530, 30)
-vec2 <- .bincode(vec, bin_x, TRUE, TRUE)
+bin_vec <- .bincode(age_vec, bin_x, TRUE, TRUE)
 
-wt_age["bin"] <- vec2
+wt_age["bin"] <- bin_vec
 
 ### start the summarize pipe, exclude unknown genotypes, NA weights or outliers (> 55)
 ### group by SEX, GENOTYPE, and by the age in days then calc the mean
@@ -42,8 +42,9 @@ wt_sum
     facet_wrap(~SEX, nrow = 2) + 
     labs(x = "Age in months", y = "Body weight in grams") + 
     scale_x_continuous(breaks = c(0, 5, 10, 15, 20, 25, 30)))
+
 ### save the plot
-ggsave("weight_age.png", width = 30, height = 20, units = "cm")
+ggsave("weight_age.png", width = 20, height = 20, units = "cm")
 
 ###  Save table to CSV file
 write.csv(wt_age, "wt_age.csv")
