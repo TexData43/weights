@@ -1,0 +1,134 @@
+---
+title: "Weight conversion"
+author: "Tom"
+date: "October 12, 2017"
+output: html_document
+---
+
+### Wrangling the behavior weight data sheet
+
+Working with the full tidyverse and the lubridate time-package
+
+```{r libraries}
+suppressWarnings(library(tidyverse))
+suppressWarnings(library(lubridate))
+```
+
+
+
+### Read the data into R
+
+Read the master weight sheet into R and use the gather function to go from a wide data set to a tall data set. 
+
+```{r}
+### read master weight file into R
+weights <- read_csv("share_weight.csv")
+head(weights)
+```
+
+
+
+
+### "Gather" the data
+The gather() function is used to shift data that is a column header into a single row. This converts for example the column headers Dec 13, 2013, December 27th, 2013, January 12th, 2014, etc from column headers into a single column named "date." The corresponding weights are matched to the appropriate animals and into a new column named "weight." We can see that now the date and corresponding weights are matched into new columns named date/weight.
+
+
+```{r}
+### Gather the data from columns into a single row for tidy data
+wt_gather <- weights %>% gather(date, weight, 5:117)
+head(wt_gather)
+```
+
+### Convert dates to machine-readable
+
+We can then convert the dates from the December 13th, 2013 format into a 12/13/13 (mdy) format that is machine-readable.
+```{r}
+### Convert the dates into machine-readable month-day-year dates
+wt_gather$date <- mdy(wt_gather$date)
+wt_gather$DOB <- mdy(wt_gather$DOB)
+```
+
+
+
+
+
+### Calculate the time difference between birth date and date weight taken
+
+Using the timediff function behind the scenes we can create a new column (age_wt) that calculates the number of days between the date of the weight and the date of birth. We can exclude the dates that are negative. Additionally we convert weight to numeric, as it was originally imported as a character (eg letter).
+
+```{r}
+### Calculate the difference in days between the date of birth (DOB)
+### and the specific date the weight was taken
+### convert weight to numeric instead of character
+wt_age <- wt_gather %>% 
+  mutate(age_wt = date - DOB) %>% 
+  filter(age_wt > 0)
+wt_age$weight <- as.numeric(wt_age$weight)
+
+head(wt_age)
+```
+
+
+
+
+
+### Time binning
+
+To associate the days w/ number of months between weights we can pull the wt_age (time between weight date/DOB) and then "bin" it into 30 day increments. This is slightly messy for use in statistics, as 31 days = 2 months, while 30 days = 1 month, but it works perfectly for graphing. We then add a new column to our original dataframe that incorporates the matching time-bins to the animals. In this example, 135 days = 4 months + 15 days = 5 months.
+
+```{r}
+### create a vector and then bin
+age_vec <- wt_age$age_wt
+bin_x <- seq(0, 1530, 30)
+bin_vec <- .bincode(age_vec, bin_x, TRUE, TRUE)
+
+
+wt_age["bin"] <- bin_vec
+
+head(wt_age)
+```
+
+
+
+
+### Summarize the date by sex, genotype, and time bin
+
+Now that we have a nice tidy data set we can exclude animals w/ unknown genotypes, weights that don't exist, or outliers (one animal has a bodyweight of 2708 g). Our summary stats are grouped by sex, genotype, and then time bin. The summary stats include the N and the mean weight. From the header we can see the new dataframe, which now has headers for sex, gt, time bin, n, and then weight. It is origin/systat ready, or we can keep going in R for preliminary graphs.
+
+```{r}
+### start the summarize pipe, exclude unknown genotypes, NA weights or outliers (> 55)
+### group by SEX, GENOTYPE, and by the age in days then calc the mean
+wt_sum <- wt_age %>% 
+  filter(GENOTYPE != "NA", GENOTYPE != "?", weight != "NA", weight < 55) %>% 
+  group_by(SEX, GENOTYPE, bin) %>% 
+  summarise(n = n(), weight = mean(weight, na.rm = T))
+
+### view the end results
+wt_sum
+```
+
+
+
+
+### Preliminary graph
+
+We can graph the prelim data, and facet by sex/genotype. I applied a smoothed line of best fit, not a true correlation but a moving average equivalent.
+
+```{r, echo = TRUE}
+### Faceted graph by genotype and sex
+(g1 <- ggplot(data = wt_sum, aes(x = bin, y = weight, color = GENOTYPE)) + 
+    geom_point(size = 6, alpha = 0.2) + 
+    geom_smooth(alpha = .5, size = 1.5) + 
+    facet_wrap(~SEX, nrow = 2) + 
+    labs(x = "Age in months", y = "Body weight in grams") + 
+    scale_x_continuous(breaks = c(0, 5, 10, 15, 20, 25, 30)))
+```
+
+
+These last two steps would save the graph and the data file into excel.
+
+### save the plot
+ggsave("weight_age.png", width = 20, height = 20, units = "cm")
+
+###  Save table to CSV file
+write.csv(wt_age, "wt_age.csv")
